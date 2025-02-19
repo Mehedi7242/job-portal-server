@@ -82,6 +82,20 @@ async function run() {
     //     const result = await jobs.findOne(query)
     //     res.send(result)
     // })
+    app.patch('/job-application/:id',async(req, res)=>{
+      const id =req.params.id;
+      const data = req.body;
+      const filter = {_id:new ObjectId(id)};
+      const updatedDoc = {
+        $set:{
+          status:data.status
+        }
+      }
+      const result = await job_applications.updateOne(filter,updatedDoc);
+    })
+
+    
+    
 
     const { ObjectId } = require('mongodb');
     app.get('/jobs/:id', async (req, res) => {
@@ -106,6 +120,10 @@ async function run() {
             res.status(500).json({ error: 'Server error' });
         }
     });
+
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
