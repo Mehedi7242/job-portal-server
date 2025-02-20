@@ -1,13 +1,37 @@
 const express = require('express')
 const cors = require ('cors')
 const app = express()
+const cookieParser = require("cookie-parser");
 const port = process.env.PORT || 3000;
 require('dotenv').config()
-app.use(cors())
-app.use(express.json())
 
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}))
+
+app.use(express.json())
+app.use(cookieParser());
+
+const logger = (req, res, next) => {
+  console.log('inside the logger');
+  next();
+};
+
+const varifyToken = (req, res, next) => {
+  console.log('inside the varifyToken');
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).send('Access Denied');
+  }
+  next();
+};
+
+
+var jwt = require('jsonwebtoken');
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const e = require('express');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.pzup6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -29,9 +53,26 @@ async function run() {
     const job_applications = jobsCollection.collection('job_applications')
 
 
+    //auth related apis
+    app.post('/jwt',async(req, res)=>{
+      const user = req.body;
+      const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,
+        {expiresIn:'1h'}
+      )
+      res
+      .cookie("token",token,{
+        httpOnly:true,
+        secure:false,
+        sameSite:"strict"
+      })
+      .send({success:true});
 
+    })
+
+ 
 
     app.get('/jobs',async(req, res)=>{
+
         const cursor = jobs.find()
         const result = await cursor.toArray();
         res.send(result);
@@ -47,13 +88,15 @@ async function run() {
       
 
     })
-    app.get('/job-application',async(req, res)=>{
+    app.get('/job-application',varifyToken,async(req, res)=>{
+      console.log('Cookies:', JSON.stringify(req.cookies, null, 2));
+      console.log('indside the api call back')
       const email = req.query.email;
       const query = {applicant_email:email}
       const result =await job_applications.find(query).toArray();
 
       for(const application of result){
-        console.log(application.job_id)
+    
         const jobQuery = {_id:new ObjectId(application.job_id)}
         const QueryResult = await jobs.findOne(jobQuery);
         if (QueryResult){
@@ -82,6 +125,10 @@ async function run() {
     //     const result = await jobs.findOne(query)
     //     res.send(result)
     // })
+
+  
+
+
     app.patch('/job-application/:id',async(req, res)=>{
       const id =req.params.id;
       const data = req.body;
